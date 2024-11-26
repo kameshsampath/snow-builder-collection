@@ -2,3 +2,4 @@ snowflake-snowpark-python
 streamlit
 pytest
 watchdog
+snowflake-cli
