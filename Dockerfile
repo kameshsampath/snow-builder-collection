@@ -23,7 +23,7 @@ ENV PATH="${HOME}/.local/bin:${PATH}"
 RUN pip install --no-cache-dir --user -U pip  \
   && pip install --no-cache-dir --user  -r /requirements.txt
 
-RUN mkdir -p "${HOME}/{.snowflake,app}"
+RUN mkdir -p "${HOME}/.snowflake" "${HOME}/.app"
 
 
 WORKDIR ${HOME}/app
