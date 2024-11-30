@@ -20,6 +20,9 @@ env:
 jobs:
   base:
     uses: ./.github/workflows/snow-base.yml
+    permissions:
+      contents: read
+      packages: write
 
   forgeconfig-build-and-push:
     needs: base
