@@ -94,4 +94,3 @@ jobs:
             BASE_IMAGE=${{ needs.base.outputs.image_tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          file: Dockerfile
