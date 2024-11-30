@@ -1,5 +1,5 @@
 ARG PYTHON_TAG=311
-FROM ghcr.io/kameshsampath/snow-dev:${PYTHON_TAG}
+FROM ghcr.io/kameshsampath/snow-base:${PYTHON_TAG}
 
 USER me
 

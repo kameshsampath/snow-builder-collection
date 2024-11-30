@@ -14,12 +14,17 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+  workflow_call:
 
 env:
   REGISTRY: ghcr.io
 
 jobs:
-  build-and-push:
+  base:
+    uses: ./.github/workflows/snow-base.yml
+
+  forgeconfig-build-and-push:
+    needs: base-build-and-push
     runs-on: ubuntu-latest
     strategy:
       matrix:
