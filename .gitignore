@@ -1,3 +1,4 @@
 work
 .snowflake
 !scripts/** */
+!.env.example
