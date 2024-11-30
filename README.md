@@ -1,6 +1,6 @@
 # snow-builder-collection
 
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE) [![Build Snow Base](https://github.com/kameshsampath/snow-builder-collection/actions/workflows/base.yml/badge.svg)](https://github.com/kameshsampath/snow-builder-collection/actions/workflows/base.yml)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE) [![Build Snow Base](https://github.com/kameshsampath/snow-builder-collection/actions/workflows/snow-base.yml/badge.svg)](https://github.com/kameshsampath/snow-builder-collection/actions/workflows/snow-base.yml) [![Build Snow ForgeConfig](https://github.com/kameshsampath/snow-builder-collection/actions/workflows/snow-forgeconfig.yml/badge.svg)](https://github.com/kameshsampath/snow-builder-collection/actions/workflows/snow-forgeconfig.yml)
 
 A curated collection of containerized tools and utilities designed to enhance the Snowflake Builder experience. This repository aims to streamline common development tasks, automate configurations, and provide standardized environments for Snowflake development.
 
