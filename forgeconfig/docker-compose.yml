@@ -1,0 +1,18 @@
+services:
+   config:
+     container_name: snow-forgeconfig
+     build:
+       dockerfile: Dockerfile
+       context: .
+     image: ghcr.io/kameshsampath/snow-builder-collection/snow-forgeconfig:py-311
+     pull_policy: always
+     user: me
+     volumes:
+        - snow_forgeconfig:/home/me/.snowflake
+     entrypoint: /home/me/.local/bin/run
+     env_file: 
+      - .env
+volumes:
+  snow_forgeconfig:
+       
+

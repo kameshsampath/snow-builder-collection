@@ -1,0 +1,88 @@
+name: Build and Push Docker Images
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*.*.*"]
+    paths-ignore:
+      - README.md
+      - LICENSE
+      - .gitignore
+      - .tools-version
+      - docker-compose.yml
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11"]
+        include:
+          - python-version: "3.11"
+            tag-suffix: "py-311"
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log into GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set lowercase image name
+        run: |
+          echo "IMAGE_NAME=$(echo ${{ github.repository }}/snow-base | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+
+      - name: Generate tags
+        id: tags
+        run: |
+          if [[ "${{ github.ref }}" == "refs/tags/"* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+            echo "tags=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.tag-suffix }},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.tag-suffix }}-${VERSION}" >> $GITHUB_OUTPUT
+          else
+            echo "tags=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.tag-suffix }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: base
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.tags.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            PYTHON_VERSION=${{ matrix.python-version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

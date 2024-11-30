@@ -1,20 +1,64 @@
-# Snowflake Development Container Tools
+# snow-builder-collection
 
-A container image with tools required to build with Snowflake and Streamlit. Refer to the [constraints](/constraints.txt)for packages added to this container image.
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-## Using 
+A curated collection of containerized tools and utilities designed to enhance the Snowflake Builder experience. This repository aims to streamline common development tasks, automate configurations, and provide standardized environments for Snowflake development.
 
-A image using Python 3.11
+## What's Inside
 
-```shell
-docker pull ghcr.io/kameshsampath/snow-dev:py-311
-```
+- `base`: A standardized Python development container with common Snowflake packages and utilities
+- `forgeconfig`: Automated RSA key generation and configuration management for Snowflake users
 
-The image also has `snow` cli installed, just run:
+## Purpose
 
-```
-docker run -it -v "$HOME/.snowflake:/home/me/.snowflake" snow connection test -c trial
-```
+This collection exists to provide consistent development environments, automate repetitive setup tasks, streamline security configurations, reduce development overhead, and share best practices through code.
 
->[!IMPORTANT]
-> When mounting volumes make sure the keys if any are accessible inside the container.
+## Target Audience
+
+Built by Builders, for Builders working with Snowflake data platforms.
+
+## Getting Started
+
+### Prerequisites
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- [Snowflake Trial Account](https://signup.snowflake.com/)
+
+### Verification Steps
+
+- Verify Docker installation:
+   ```bash
+   docker --version
+   ```
+
+- Confirm Docker is running:
+   ```bash
+   docker ps
+   ```
+
+- Log into your Snowflake account and confirm you can access the web interface
+
+### Component Usage
+
+#### Base Container
+
+The [base](./base) container provides a standardized Python development environment for Snowflake projects. 
+
+> [!NOTE]
+> Documentation coming soon.
+
+#### Forgeconfig
+
+The [forgeconfig](./forgeconfig) utility helps manage RSA key generation and configuration for Snowflake users. 
+
+> [!NOTE]
+> Documentation coming soon.
+
+## References
+
+- [Docker Desktop Installation Guide](https://docs.docker.com/desktop/)
+- [Snowflake Documentation](https://docs.snowflake.com/)
+
+## License
+
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.

@@ -2,8 +2,8 @@ ARG PYTHON_VERSION=3.11
 
 FROM python:$PYTHON_VERSION-slim
 
-LABEL org.opencontainers.image.source=https://github.com/kameshsampath/snow-dev.git
-LABEL org.opencontainers.image.description="Snowflake Development Tools."
+LABEL org.opencontainers.image.source=https://github.com/kameshsampath/snow-builder-collection.git
+LABEL org.opencontainers.image.description="Base image for Snowflake Development with Snowflake Development Tools."
 LABEL org.opencontainers.image.licenses=ASL-2
 
 RUN apt-get update \
@@ -24,7 +24,6 @@ RUN pip install --no-cache-dir --user -U pip  \
   && pip install --no-cache-dir --user  -r /requirements.txt
 
 RUN mkdir -p "${HOME}/.snowflake" "${HOME}/.app"
-
 
 WORKDIR ${HOME}/app
 

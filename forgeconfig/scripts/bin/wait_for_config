@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+
+import time
+from pathlib import Path
+from typing import Optional
+
+from log.logger import get_logger as _logger
+
+logger = _logger("wait_for_config")
+
+
+def wait_for_file(
+    directory: Optional[Path],
+    filename: str,
+    check_interval: float = 1.0,
+    timeout: Optional[float] = 30.0,
+) -> bool:
+    """
+    Wait for a specific file to be created in the given directory.
+
+    Args:
+        directory (Union[str, Path]): Directory path to monitor
+        filename (str): Name of the file to wait for
+        check_interval (float): Time in seconds between checks (default: 1.0)
+        timeout (Optional[float]): Maximum time to wait in seconds (default: None)
+
+    Returns:
+        bool: True if file was created, False if timeout occurred
+
+    Raises:
+        ValueError: If directory doesn't exist or if check_interval/timeout are invalid
+    """
+    # Convert directory to Path object and validate inputs
+    dir_path = Path(directory)
+    if not dir_path.is_dir():
+        raise ValueError(f"Directory does not exist: {directory}")
+    if check_interval <= 0:
+        raise ValueError("check_interval must be positive")
+    if timeout is not None and timeout <= 0:
+        raise ValueError("timeout must be positive or None")
+
+    # Calculate end time if timeout is specified
+    start_time = time.monotonic()
+    end_time = start_time + timeout
+
+    target_file = dir_path.joinpath(filename)
+    logger.info(f"Waiting for file: {target_file}")
+
+    while True:
+        # Check if timeout has occurred
+        if end_time and time.monotonic() > end_time:
+            logger.info(f"Timeout reached while waiting for file {target_file}")
+            return False
+
+        # Check if file exists
+        if target_file.exists():
+            logger.info(f"Snowflake Config: {target_file} is available.")
+            return True
+
+        # Wait before next check
+        time.sleep(check_interval)
+
+
+def main():
+    try:
+        success = wait_for_file(
+            directory=Path.home().joinpath(".snowflake"),
+            filename="config.toml",
+            timeout=30.0,
+        )
+        exit(0 if success else 1)
+    except ValueError as e:
+        print(f"Error: {e}")
+        exit(2)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,4 +1,4 @@
-name: Build and Push Docker Images
+name: Build Snowflake Config
 
 on:
   push:
@@ -8,13 +8,15 @@ on:
       - README.md
       - LICENSE
       - .gitignore
+      - .tools-version
+      - .env.example
+      - docker-compose.yml
   pull_request:
     branches: [main]
   workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   build-and-push:
@@ -47,6 +49,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set lowercase image name
+        run: |
+          echo "IMAGE_NAME=$(echo ${{ github.repository }}/snow-forgeconfig | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -72,12 +78,13 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: forgeconfig
           platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.tags.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            PYTHON_VERSION=${{ matrix.python-version }}
+            PYTHON_TAG=${{ matrix.tag-suffix }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          file: Dockerfile

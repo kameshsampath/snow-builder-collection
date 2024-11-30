@@ -1,0 +1,11 @@
+default_connection_name = "{{connection_name}}"
+
+[connections]
+[connections.{{connection_name}}]
+account = "{{account}}"
+user = "{{user}}"
+private_key_path = "{{private_key_file}}"
+private_key_file = "{{private_key_file}}"
+role = "{{default_role}}"
+authenticator = "SNOWFLAKE_JWT"
+warehouse = "{{warehouse}}"

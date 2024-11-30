@@ -1,0 +1,177 @@
+#!/usr/bin/env python3
+import os
+import sys
+
+from typing import Tuple
+import logging
+from pathlib import Path
+
+from security.user import UserUtil
+from security.connection_config import ConnectionConfig
+from security.key_util import (
+    match_fingerprints,
+    get_key_fingerprint,
+    load_rsa_public_key,
+)
+from snowflake.snowpark.session import Session
+from snowflake.core import Root
+from snowflake.core.user import User
+
+from log.logger import get_logger
+
+#
+logger = get_logger("user_setup_util")
+
+
+class UserSetupUtil:
+
+    def __init__(self):
+        self._snowflake_account = os.getenv("SNOWFLAKE_ACCOUNT")
+        self._snowflake_user = os.getenv("SNOWFLAKE_USER")
+        self._snowflake_password = os.getenv("SNOWFLAKE_PASSWORD")
+        self._snowflake_role = os.getenv("SNOWFLAKE_ROLE", "ACCOUNTADMIN")
+        self._snowflake_warehouse = (
+            os.getenv("SNOWFLAKE_WAREHOUSE")
+            if os.getenv("SNOWFLAKE_WAREHOUSE")
+            else "COMPUTE_WH"
+        )
+        self._keys_dir: Path = os.getenv(
+            "PRIVATE_KEY_FILE_DIR", Path.home().joinpath(".snowflake")
+        )
+        self._private_key_passphrase = os.getenv("PRIVATE_KEY_PASSPHRASE", None)
+        self.session = None
+
+    def generate_and_set_rsa_keys(self, force: bool = False) -> Tuple[Path, str, bool]:
+        self._pk_file = self._keys_dir.joinpath("snowflake_user.p8")
+        self._pub_file = self._keys_dir.joinpath("snowflake_user.pub")
+        if (
+            not force
+            and (self._keys_dir.exists() and self._keys_dir.is_dir())
+            and (self._pk_file.exists() and self._pk_file.is_file())
+            and (self._pub_file.exists() and self._pub_file.is_file())
+        ):
+            logger.info("KeyPair exists and configured, skip creation.")
+            pub_key = load_rsa_public_key(self._pub_file)
+            fp = get_key_fingerprint(pub_key)
+            return (
+                self._pub_file,
+                fp,
+                False,
+            )
+        else:
+            logger.info("Generating KeyPair")
+            self.session = Session.builder.configs(
+                {
+                    "account": self._snowflake_account,
+                    "user": self._snowflake_user,
+                    "password": self._snowflake_password,
+                    "role": self._snowflake_role,
+                }
+            ).getOrCreate()
+
+            user_util = UserUtil(
+                self.session,
+                self._keys_dir,
+            )
+            return user_util.set_or_rotate_public_key(self._snowflake_user)
+
+    def create_or_update_config(self, default_connection_name: str):
+        conn_config = ConnectionConfig(
+            self._keys_dir,
+            self._snowflake_account,
+            self._snowflake_user,
+            self._pk_file,
+            default_connection_name,
+            self._snowflake_role,
+            self._snowflake_warehouse,
+        )
+        conn_config.write_config()
+
+    def verify_keys_and_settings(
+        self, public_key_fp: str, default_connection_name: str
+    ):
+        logger.debug("Verifying connection with new public key")
+        if self.session is None:
+            logger.debug("Creating new session")
+            self.session = Session.builder.config(
+                "connection_name",
+                default_connection_name,
+            ).create()
+        _session = None
+        try:
+            root = Root(self.session)
+            user: User = root.users[self._snowflake_user].fetch()
+            # should match either rsa_public_key or rsa_public_key2
+            # strip SHA256:
+            _key_fp_1 = match_fingerprints(
+                public_key_fp, user.rsa_public_key_fp.replace("SHA256:", "")
+            )
+            if _key_fp_1:
+                logger.debug(
+                    f"Fingerprints '{public_key_fp}' == '{user.rsa_public_key_fp.replace('SHA256:', '')}' matches."
+                )
+            _key_fp_2 = match_fingerprints(
+                public_key_fp, user.rsa_public_key_2_fp.replace("SHA256:", "")
+            )
+            if _key_fp_2:
+                logger.debug(
+                    f"Fingerprints '{public_key_fp}' == '{user.rsa_public_key_2_fp.replace('SHA256:', '')}' matches."
+                )
+            if _key_fp_1 and _key_fp_2:
+                logger.error(
+                    f"Fingerprints mismatch,{public_key_fp} != {user.rsa_public_key_fp}\n\n or {public_key_fp} != {user.rsa_public_key_2_fp}"
+                )
+                return
+            logger.info(f"Fingerprints matches!")
+            # build a new session from the new config to make sure all works
+            _session = Session.builder.config(
+                "connection_name",
+                default_connection_name,
+            ).create()
+            _session.sql("DESC USER")
+            logger.info("User keys configured and working")
+        except Exception as e:
+            logger.error(f"Error verifying, {e}", stack_info=True)
+            raise e
+        finally:
+            if _session is not None:
+                _session.close()
+
+
+def main():
+    if os.getenv("SNOWFLAKE_ACCOUNT") is None:
+        logger.error("Environment variable 'SNOWFLAKE_ACCOUNT' is not defined")
+        sys.exit(1)
+
+    if os.getenv("SNOWFLAKE_USER") is None:
+        logger.error("Environment variable 'SNOWFLAKE_USER' is not defined")
+        sys.exit(1)
+
+    if os.getenv("SNOWFLAKE_ACCOUNT") is None:
+        logger.error("Environment variable 'SNOWFLAKE_ACCOUNT' is not defined")
+        sys.exit(1)
+
+    if os.getenv("SNOWFLAKE_PASSWORD") is None:
+        logger.error("Environment variable 'SNOWFLAKE_PASSWORD' is not defined")
+        sys.exit(1)
+
+    if os.getenv("SNOWFLAKE_ROLE") is None:
+        logger.warning(
+            "Environment variable 'SNOWFLAKE_ROLE' is not defined, defaulting to 'ACCOUNTADMIN'"
+        )
+
+    if os.getenv("SNOWFLAKE_WAREHOUSE") is None:
+        logger.warning(
+            "Environment variable 'SNOWFLAKE_WAREHOUSE' is not defined,using 'COMPUTE_WH' will be created if not exists."
+        )
+
+    logger.info("Good to run the Snowflake user configuration.")
+    user_util = UserSetupUtil()
+    _, public_key_fp, _ = user_util.generate_and_set_rsa_keys()
+    default_connection_name = os.getenv("SNOWFLAKE_DEFAULT_CONNECTION_NAME", "default")
+    user_util.create_or_update_config(default_connection_name)
+    user_util.verify_keys_and_settings(public_key_fp, default_connection_name)
+
+
+if __name__ == "__main__":
+    main()
