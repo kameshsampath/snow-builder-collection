@@ -30,7 +30,7 @@ setup_container() {
     # For example: checking required environment variables,
     # validating configs, setting up directories, etc.
     setup_environment
-    
+
     # Return 0 for success, non-zero for failure
     return 0
 }
@@ -38,16 +38,16 @@ setup_container() {
 # Main entrypoint
 main() {
     log "Starting container"
-    
+
     setup_container
 
     if ! user_key_setup; then
         log "User setup failed"
         exit 1
     fi
-    
+
     log "Successfully setup your Snowflake user with keys"
-    
+
     # Keep container running
     # Using `tail -f /dev/null` is a common pattern for keeping containers alive
     # while still responding properly to signals

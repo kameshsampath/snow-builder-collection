@@ -1,6 +1,4 @@
-jinja2
-PyJWT
 snowflake
 snowflake-snowpark-python
 requests
-pytest
+tomli-w

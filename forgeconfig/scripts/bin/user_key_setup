@@ -1,30 +1,27 @@
 #!/usr/bin/env python3
 import os
 import sys
-
-from typing import Tuple
-import logging
 from pathlib import Path
+from typing import Tuple
 
-from security.user import UserUtil
-from security.connection_config import ConnectionConfig
-from security.key_util import (
-    match_fingerprints,
-    get_key_fingerprint,
-    load_rsa_public_key,
-)
-from snowflake.snowpark.session import Session
 from snowflake.core import Root
 from snowflake.core.user import User
+from snowflake.snowpark.session import Session
 
 from log.logger import get_logger
+from security.connection_config import ConnectionConfig
+from security.key_util import (
+    get_key_fingerprint,
+    load_rsa_public_key,
+    match_fingerprints,
+)
+from security.user import UserUtil
 
 #
 logger = get_logger("user_setup_util")
 
 
 class UserSetupUtil:
-
     def __init__(self):
         self._snowflake_account = os.getenv("SNOWFLAKE_ACCOUNT")
         self._snowflake_user = os.getenv("SNOWFLAKE_USER")
@@ -122,7 +119,7 @@ class UserSetupUtil:
                     f"Fingerprints mismatch,{public_key_fp} != {user.rsa_public_key_fp}\n\n or {public_key_fp} != {user.rsa_public_key_2_fp}"
                 )
                 return
-            logger.info(f"Fingerprints matches!")
+            logger.info("Fingerprints matches!")
             # build a new session from the new config to make sure all works
             _session = Session.builder.config(
                 "connection_name",

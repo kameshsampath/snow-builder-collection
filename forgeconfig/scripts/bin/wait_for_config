@@ -1,8 +1,7 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3  # noqa: D100
 
 import time
 from pathlib import Path
-from typing import Optional
 
 from log.logger import get_logger as _logger
 
@@ -10,13 +9,12 @@ logger = _logger("wait_for_config")
 
 
 def wait_for_file(
-    directory: Optional[Path],
+    directory: Path | None,
     filename: str,
     check_interval: float = 1.0,
-    timeout: Optional[float] = 30.0,
+    timeout: float | None = 30.0,
 ) -> bool:
-    """
-    Wait for a specific file to be created in the given directory.
+    """Wait for a specific file to be created in the given directory.
 
     Args:
         directory (Union[str, Path]): Directory path to monitor
@@ -29,6 +27,7 @@ def wait_for_file(
 
     Raises:
         ValueError: If directory doesn't exist or if check_interval/timeout are invalid
+
     """
     # Convert directory to Path object and validate inputs
     dir_path = Path(directory)
@@ -61,7 +60,7 @@ def wait_for_file(
         time.sleep(check_interval)
 
 
-def main():
+def main():  # noqa: D103
     try:
         success = wait_for_file(
             directory=Path.home().joinpath(".snowflake"),

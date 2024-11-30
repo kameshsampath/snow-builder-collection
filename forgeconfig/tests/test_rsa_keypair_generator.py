@@ -1,42 +1,37 @@
-import logging
+"""Tests for RSA Key Generator."""
+
 from pathlib import Path
-from typing import Optional, Union
+
 import pytest
-import shutil
-
-from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import padding
-from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
-from security.rsa_keypair_generator import (
+from log.logger import get_logger as _logger
+from security.rsa.keypair_generator import (
+    create_secure_key_directory,
     gen_key,
     save_key_pair,
-    create_secure_key_directory,
 )
 
-logger = logging.getLogger("rsa_keypair_tests")
-logging.basicConfig(
-    format="%(levelname)s:%(message)s",
-)
+logger = _logger("rsa_keypair_tests")
 
 
-class KeyVerificationError(Exception):
-
-    def __init__(self, *args):
+class KeyVerificationError(Exception):  # noqa: D101
+    def __init__(self, *args):  # noqa: D107
         super().__init__(*args)
 
 
 def verify_keypair(
     private_key: rsa.RSAPrivateKey, public_key: rsa.RSAPublicKey
 ) -> bool:
-    """
-    Verify if an RSA keypair is valid by performing multiple checks:
-    1. Encryption/Decryption test
-    2. Signature/Verification test
-    3. Key size match
-    4. Public exponent match
+    """Verify if an RSA keypair is valid by performing multiple checks.
+
+      Checks:
+      1. Encryption/Decryption test
+      2. Signature/Verification test
+      3. Key size match
+      4. Public exponent match
 
     Args:
         private_key: RSA private key object
@@ -46,13 +41,12 @@ def verify_keypair(
         bool: True if keypair is valid, False otherwise
 
     """
-
     try:
         # Test message
         message = b"Test message for RSA keypair verification"
 
         # Encryption/Decryption
-        ciphertext = public_key.encrypt(
+        cipher_text = public_key.encrypt(
             message,
             padding.OAEP(
                 mgf=padding.MGF1(algorithm=hashes.SHA256()),
@@ -62,7 +56,7 @@ def verify_keypair(
         )
 
         decrypted = private_key.decrypt(
-            ciphertext,
+            cipher_text,
             padding.OAEP(
                 mgf=padding.MGF1(algorithm=hashes.SHA256()),
                 algorithm=hashes.SHA256(),
@@ -114,10 +108,9 @@ def verify_keypair(
 
 
 def load_private_key(
-    private_key_path: Union[str, Path], passphrase: Optional[Union[str, bytes]] = None
+    private_key_path: str | Path, passphrase: str | bytes | None = None
 ) -> rsa.RSAPrivateKey:
-    """
-    Load a private key from file, handling both encrypted and unencrypted keys.
+    """Load a private key from file, handling both encrypted and unencrypted keys.
 
     Args:
         private_key_path: Path to the private key file
@@ -129,6 +122,7 @@ def load_private_key(
     Raises:
         ValueError: If passphrase is required but not provided
         OSError: If file reading fails
+
     """
     if passphrase is not None and isinstance(passphrase, str):
         passphrase = passphrase.encode()
@@ -147,9 +141,8 @@ def load_private_key(
             raise
 
 
-def load_public_key(public_key_path: Union[str, Path]) -> rsa.RSAPublicKey:
-    """
-    Load a public key from file.
+def load_public_key(public_key_path: str | Path) -> rsa.RSAPublicKey:
+    """Load a public key from file.
 
     Args:
         public_key_path: Path to the public key file
@@ -159,6 +152,7 @@ def load_public_key(public_key_path: Union[str, Path]) -> rsa.RSAPublicKey:
 
     Raises:
         OSError: If file reading fails
+
     """
     with open(public_key_path, "rb") as key_file:
         public_key = serialization.load_pem_public_key(
@@ -168,12 +162,11 @@ def load_public_key(public_key_path: Union[str, Path]) -> rsa.RSAPublicKey:
 
 
 def verify_keypair_files(
-    private_key_path: Union[str, Path],
-    public_key_path: Union[str, Path],
-    passphrase: Optional[Union[str, bytes]] = None,
+    private_key_path: str | Path,
+    public_key_path: str | Path,
+    passphrase: str | bytes | None = None,
 ) -> bool:
-    """
-    Verify if a keypair stored in files is valid, handling both encrypted and unencrypted keys.
+    """Verify if a keypair stored in files is valid, handling both encrypted and unencrypted keys.
 
     Args:
         private_key_path: Path to private key file
@@ -182,6 +175,7 @@ def verify_keypair_files(
 
     Returns:
         bool: True if keypair is valid, False otherwise
+
     """
     try:
         # Load keys
@@ -197,7 +191,7 @@ def verify_keypair_files(
 
 
 @pytest.fixture
-def keys_dir():
+def keys_dir():  # noqa: D103
     _keys_dir = Path.joinpath(Path.cwd(), "tests", "keys")
     _keys_dir = create_secure_key_directory(_keys_dir)
     yield _keys_dir
@@ -208,7 +202,7 @@ def keys_dir():
     Path.rmdir(_keys_dir)
 
 
-def test_create_keys_directory(keys_dir):
+def test_create_keys_directory(keys_dir):  # noqa: D103
     assert keys_dir is not None
     assert keys_dir.exists() is True
     assert keys_dir.is_dir() is True
@@ -216,7 +210,7 @@ def test_create_keys_directory(keys_dir):
     assert mode == "700"
 
 
-def test_save_key_pair(keys_dir):
+def test_save_key_pair(keys_dir):  # noqa: D103
     private_key_path = keys_dir.joinpath("test_pk.p8")
     public_key_path = keys_dir.joinpath("test_pk.pub")
     private_key_passphrase = "test123@@"
@@ -248,7 +242,7 @@ def test_save_key_pair(keys_dir):
     assert is_valid is True
 
 
-def test_save_key_pair_without_passphrase(keys_dir):
+def test_save_key_pair_without_passphrase(keys_dir):  # noqa: D103
     private_key_path = keys_dir.joinpath("test_pk.p8")
     public_key_path = keys_dir.joinpath("test_pk.pub")
 

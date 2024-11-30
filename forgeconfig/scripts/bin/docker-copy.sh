@@ -1,11 +1,11 @@
 #!/bin/bash
 
-set -euo pipefail 
+set -euo pipefail
 
 DOCKER_VOL_NAME=snow_forgeconfig
 CONTAINER_NAME="data_${DOCKER_VOL_NAME}"
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-DOCKER_COMPOSE_DIR="$(dirname $(dirname "$SCRIPT_DIR"))"
+DOCKER_COMPOSE_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 DOCKER_COMPOSE_PROJECT_NAME=$(basename "$DOCKER_COMPOSE_DIR")
 
 docker run -v "${CONTAINER_NAME}":/snowflake busybox
