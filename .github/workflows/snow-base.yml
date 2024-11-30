@@ -14,6 +14,10 @@ on:
     branches: [main]
   workflow_dispatch:
   workflow_call:
+    outputs:
+      image_tags:
+        description: "Built image tags"
+        value: ${{ jobs.base-build-and-push.outputs.tags }}
 
 env:
   REGISTRY: ghcr.io
@@ -21,6 +25,8 @@ env:
 jobs:
   base-build-and-push:
     runs-on: ubuntu-latest
+    outputs:
+      tags: ${{ steps.tags.outputs.tags }}
     strategy:
       matrix:
         python-version: ["3.11"]

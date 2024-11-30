@@ -1,5 +1,5 @@
-ARG PYTHON_TAG=311
-FROM ghcr.io/kameshsampath/snow-base:${PYTHON_TAG}
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
 
 USER me
 

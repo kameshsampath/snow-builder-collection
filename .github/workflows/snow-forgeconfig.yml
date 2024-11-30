@@ -1,4 +1,4 @@
-name: Build Snowflake Config
+name: Build Snow ForgeConfig
 
 on:
   push:
@@ -13,12 +13,10 @@ on:
       - docker-compose.yml
   pull_request:
     branches: [main]
-  workflow_dispatch:
-  workflow_call:
+  workflow_dispatch: # Keep this if you want manual triggers
 
 env:
   REGISTRY: ghcr.io
-
 jobs:
   base:
     uses: ./.github/workflows/snow-base.yml
@@ -90,6 +88,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             PYTHON_TAG=${{ matrix.tag-suffix }}
+            BASE_IMAGE=${{ needs.base.outputs.image_tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           file: Dockerfile
