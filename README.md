@@ -1,4 +1,4 @@
-# snow-builder-collection
+# Snow Builder Collection
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE) [![Build Snow Base](https://github.com/kameshsampath/snow-builder-collection/actions/workflows/snow-base.yml/badge.svg)](https://github.com/kameshsampath/snow-builder-collection/actions/workflows/snow-base.yml) [![Build Snow ForgeConfig](https://github.com/kameshsampath/snow-builder-collection/actions/workflows/snow-forgeconfig.yml/badge.svg)](https://github.com/kameshsampath/snow-builder-collection/actions/workflows/snow-forgeconfig.yml)
 
