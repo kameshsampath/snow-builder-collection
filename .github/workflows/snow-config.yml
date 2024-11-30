@@ -24,7 +24,7 @@ jobs:
     uses: ./.github/workflows/snow-base.yml
 
   forgeconfig-build-and-push:
-    needs: base-build-and-push
+    needs: base
     runs-on: ubuntu-latest
     strategy:
       matrix:
