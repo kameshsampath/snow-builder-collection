@@ -3,6 +3,8 @@ services:
      container_name: snow-forgeconfig
      build:
        dockerfile: Dockerfile
+       args:
+         - BASE_IMAGE=ghcr.io/kameshsampath/snow-builder-collection/snow-base:py-311
        context: .
      image: ghcr.io/kameshsampath/snow-builder-collection/snow-forgeconfig:py-311
      pull_policy: always

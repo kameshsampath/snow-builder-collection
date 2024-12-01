@@ -1,6 +1,23 @@
 {
-    "python.REPL.enableREPLSmartSend": false,
-    "cSpell.words": [
-        "forgeconfig"
-    ]
+  "python.REPL.enableREPLSmartSend": false,
+  "cSpell.words": [
+    "forgeconfig",
+    "Keypair",
+    "PYTHONPATH"
+  ],
+  "ruff.enable": true,
+  "ruff.configurationPreference": "filesystemFirst",
+  "ruff.fixAll": true,
+  "[python]": {
+    "diffEditor.ignoreTrimWhitespace": false,
+    "editor.formatOnSave": true,
+    "editor.wordBasedSuggestions": "off",
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSaveMode": "file",
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit",
+    }
+  },
+  "ruff.lint.run": "onSave",
+  "python.testing.pytestEnabled": true,
 }

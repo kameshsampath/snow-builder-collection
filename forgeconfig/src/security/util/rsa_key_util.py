@@ -1,21 +1,22 @@
-import hashlib
-from pathlib import Path
-from typing import Union
-from cryptography.hazmat.primitives import serialization, hashes
-from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.backends import default_backend
-from log.logger import get_logger as _logger
+"""Utility for handling common key operations."""
+
 import base64
+from pathlib import Path
+
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+
+from log.logger import get_logger as _logger
 
 logger = _logger("key_util")
 
 
-def load_rsa_public_key(key: Union[Path | str]) -> rsa.RSAPublicKey:
-    """
-    Load an RSA public key from a file in PEM format.
+def load_rsa_public_key(key: Path | str) -> rsa.RSAPublicKey:
+    """Load an RSA public key from a file in PEM format.
 
     Args:
-        key_path: Path of public key  or string to the public key file content
+        key: Path of public key or string to the public key file content
 
     Returns:
         RSAPublicKey: Loaded public key object
@@ -23,6 +24,7 @@ def load_rsa_public_key(key: Union[Path | str]) -> rsa.RSAPublicKey:
     Raises:
         ValueError: If file doesn't contain a valid RSA public key
         FileNotFoundError: If key file doesn't exist
+
     """
     key_data = None
     if isinstance(key, Path):
@@ -30,7 +32,7 @@ def load_rsa_public_key(key: Union[Path | str]) -> rsa.RSAPublicKey:
         with open(key, "rb") as f:
             key_data = f.read()
     else:
-        logger.debug(f"public key string")
+        logger.debug("public key string")
         key_data = bytes(key)
 
     logger.debug(f"Public Key Data:{key_data}")
@@ -48,14 +50,14 @@ def load_rsa_public_key(key: Union[Path | str]) -> rsa.RSAPublicKey:
 
 
 def get_key_fingerprint(public_key: rsa.RSAPublicKey) -> str:
-    """
-    Calculate SHA256 fingerprint of an RSA public key.
+    """Calculate SHA256 fingerprint of an RSA public key.
 
     Args:
-        public_key: RSA public key object
+        public_key: RSA public key
 
     Returns:
-        str: SHA256 fingerprint as hex string
+        str: a base64 encoded SHA256 fingerprint.
+
     """
     # Get DER encoding of the public key
     key_der = public_key.public_bytes(
@@ -74,19 +76,15 @@ def get_key_fingerprint(public_key: rsa.RSAPublicKey) -> str:
     return base64_fingerprint
 
 
-def match_fingerprints(fp_1: str, fp_2: str) -> bool:
-    """
-    Compare two RSA public keys by their fingerprints.
+def match_fingerprints(left_fp: str, right_fp: str) -> bool:
+    """Compare two RSA public keys by their fingerprints.
 
     Args:
-        fp_1: First Public Key FingerPrint
-        fp_2: Second Public Key FingerPrint
+        left_fp: First public key fingerprint
+        right_fp: Second public key fingerprint
 
     Returns:
-        Tuple containing:
-            - Boolean indicating if keys match
-            - Fingerprint of first key
-            - Fingerprint of second key
+        bool: Whether the keys have matched or not
+
     """
-    # Compare
-    return fp_1 == fp_2
+    return left_fp == right_fp

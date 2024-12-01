@@ -1,12 +1,10 @@
-# Standard library
+"""RSA KeyPair Generator helps in generating RSA Keypair to be used with Snowflake Connections."""
+
 import os
-import logging
 import stat
 from getpass import getpass
 from pathlib import Path
-from typing import Optional, Union
 
-# Third party
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -17,16 +15,18 @@ logger = _logger("rsa_keypair_generator")
 
 
 class KeyPairSaveError(Exception):
-    def __init__(self, *args):
+    """An error that is reported when there is any error generating or setting KeyPair."""
+
+    def __init__(self, *args):  # noqa: D107
         super().__init__(*args)
 
 
 def create_secure_key_directory(directory: Path | str = None) -> Path:
-    """
-    Create a directory for storing private keys with secure permissions (700).
+    """Create a directory for storing private keys with secure permissions (700).
 
     Args:
-        directory: Path where to create the secure directory. If None it creates the default directory on user home `.ssh`(~/.ssh)
+        directory: Path where to create the secure directory. If `None` it creates the
+        default directory on user home `.ssh(~/.ssh)`
 
     Returns:
         Path: Path object pointing to the created directory
@@ -34,6 +34,7 @@ def create_secure_key_directory(directory: Path | str = None) -> Path:
     Raises:
         PermissionError: If unable to set required permissions
         OSError: If directory creation fails
+
     """
     if directory is None:
         # create the default ~/.ssh directory
@@ -50,13 +51,13 @@ def create_secure_key_directory(directory: Path | str = None) -> Path:
     return key_dir
 
 
+# TODO #1 Auto generate password and store it encrypted in a pass file/add to Snowflake config `private_key_file_pwd`
 def get_secure_password(
     prompt: str = "Enter encryption password: ",
     confirm: bool = True,
     min_length: int = 8,
-) -> Optional[str]:
-    """
-    Securely get a password from the user with confirmation and validation.
+) -> str | None:
+    """Securely get a password from the user with confirmation and validation.
 
     This function prompts for a password without echoing the input to the screen,
     optionally confirms it by asking twice, and validates the minimum length.
@@ -72,6 +73,7 @@ def get_secure_password(
 
     Raises:
         ValueError: If the password is too short
+
     """
     try:
         password = getpass(prompt)
@@ -92,9 +94,8 @@ def get_secure_password(
         return None
 
 
-def gen_key(key_size: int = 4096) -> rsa.RSAPrivateKey:
-    """
-    Generate a new RSA private key with specific parameters.
+def gen_key(key_size: int = 4096) -> tuple[rsa.RSAPrivateKey, rsa.RSAPublicKey]:
+    """Generate a new RSA private key with specific parameters.
 
     This function creates an RSA private key using the default cryptographic backend.
     The key is generated with a specified key size and public exponent value for
@@ -105,7 +106,9 @@ def gen_key(key_size: int = 4096) -> rsa.RSAPrivateKey:
         - Public exponent: 65537 - a standard Fermat prime for RSA
 
     Returns:
-        rsa.RSAPrivateKey: A newly generated RSA private key object
+        A tuple with:
+            - rsa.RSAPrivateKey: A newly generated RSA private key object
+            - rsa.RSAPublicKey: The public key pair of rsa.RSAPrivateKey
 
     Raises:
         ValueError: If KEY_SIZE is not a valid key length
@@ -115,24 +118,24 @@ def gen_key(key_size: int = 4096) -> rsa.RSAPrivateKey:
         private_key = gen_key()
         # The public key can be derived using:
         public_key = private_key.public_key()
+
     """
     PUBLIC_EXPONENT = 65537
-    key = rsa.generate_private_key(
+    private_key: rsa.RSAPrivateKey = rsa.generate_private_key(
         backend=default_backend(),
         key_size=key_size,
         public_exponent=PUBLIC_EXPONENT,
     )
     logger.info("Successfully generated the RSA Key")
-    return key
+    return (private_key, private_key.public_key())
 
 
 def save_private_key(
     private_key: rsa.RSAPrivateKey,
-    filename: Union[str, Path],
-    passphrase: Union[str, bytes] = None,
+    filename: str | Path,
+    passphrase: str | bytes = None,
 ) -> None:
-    """
-    Save an encrypted private key to file with secure permissions.
+    """Save an encrypted private key to file with secure permissions.
 
     Args:
         private_key: RSA private key object
@@ -143,6 +146,7 @@ def save_private_key(
         ValueError: If the passphrase is empty
         OSError: If there are file permission or writing errors
         TypeError: If the arguments are of incorrect type
+
     """
     logger.debug(f"Saving generated RSA Key to {filename}")
     pem = None
@@ -171,19 +175,21 @@ def save_private_key(
             f.write(pem)
 
 
-def save_public_key(
-    public_key: rsa.RSAPublicKey, filename: Union[str, Path] = None
-) -> str:
-    """
-    Save a public key to file.
+def save_public_key(public_key: rsa.RSAPublicKey, filename: str | Path = None) -> str:
+    """Save a public key to file.
 
     Args:
         public_key: RSA public key object
         filename(Path,str,optional): Path to save the public key.
 
+    Returns:
+        str: the lines between `--BEGIN PUBLIC KEY--`  and `--END PUBLIC KEY--` with
+        newlines trimmed.Ideal for sharing and setting values in string references.
+
     Raises:
         OSError: If there are file permission or writing errors
         TypeError: If the arguments are of incorrect type
+
     """
     logger.debug(f"Saving generated RSA Public Key to {filename}")
     # Get public key
@@ -211,12 +217,11 @@ def save_public_key(
 
 def save_key_pair(
     private_key: rsa.RSAPrivateKey,
-    private_key_path: Union[str, Path],
-    public_key_path: Union[str, Path],
-    passphrase: Union[str, bytes] = None,
+    private_key_path: str | Path,
+    public_key_path: str | Path,
+    passphrase: str | bytes = None,
 ) -> bool:
-    """
-    Save both private and public keys securely.
+    """Save both private and public keys securely.
 
     Args:
         private_key: RSA private key object
@@ -231,6 +236,7 @@ def save_key_pair(
         ValueError: If the passphrase is empty
         OSError: If there are file permission or writing errors
         TypeError: If the arguments are of incorrect type
+
     """
     logger.debug(
         f"Saving generated RSA KeyPair to {private_key_path}/{public_key_path}"
