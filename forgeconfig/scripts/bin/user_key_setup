@@ -1,32 +1,35 @@
 #!/usr/bin/env python3
+"""Run the Snowflake User setup."""
+
 import os
 import sys
 from pathlib import Path
-from typing import Tuple
 
 from snowflake.core import Root
 from snowflake.core.user import User
 from snowflake.snowpark.session import Session
 
+from connection.config import ConnectionConfig
 from log.logger import get_logger
-from security.connection_config import ConnectionConfig
-from security.key_util import (
+from security.util.rsa_key_util import (
     get_key_fingerprint,
     load_rsa_public_key,
     match_fingerprints,
 )
-from security.user import UserUtil
+from security.util.user_util import UserUtil
 
 #
 logger = get_logger("user_setup_util")
 
 
 class UserSetupUtil:
-    def __init__(self):
+    """The utility used to setup the Snowflake user with the Keys."""
+
+    def __init__(self):  # noqa: D107
         self._snowflake_account = os.getenv("SNOWFLAKE_ACCOUNT")
         self._snowflake_user = os.getenv("SNOWFLAKE_USER")
         self._snowflake_password = os.getenv("SNOWFLAKE_PASSWORD")
-        self._snowflake_role = os.getenv("SNOWFLAKE_ROLE", "ACCOUNTADMIN")
+        self._snowflake_role = os.getenv("SNOWFLAKE_ROLE", "PUBLIC")
         self._snowflake_warehouse = (
             os.getenv("SNOWFLAKE_WAREHOUSE")
             if os.getenv("SNOWFLAKE_WAREHOUSE")
@@ -38,11 +41,23 @@ class UserSetupUtil:
         self._private_key_passphrase = os.getenv("PRIVATE_KEY_PASSPHRASE", None)
         self.session = None
 
-    def generate_and_set_rsa_keys(self, force: bool = False) -> Tuple[Path, str, bool]:
+    def generate_and_set_rsa_keys(self, rotate: bool = False) -> tuple[Path, str, bool]:
+        """Generate RSA keypair and configure the RSA key authentication with Snowflake USER.
+
+        Args:
+        rotate: Flag to rotate the keys
+
+        Returns:
+            A tuple
+              - Path - the path of the generated key path
+              - str - the public key fingerprint
+              - bool- whether the key was rotated
+
+        """
         self._pk_file = self._keys_dir.joinpath("snowflake_user.p8")
         self._pub_file = self._keys_dir.joinpath("snowflake_user.pub")
         if (
-            not force
+            not rotate
             and (self._keys_dir.exists() and self._keys_dir.is_dir())
             and (self._pk_file.exists() and self._pk_file.is_file())
             and (self._pub_file.exists() and self._pub_file.is_file())
@@ -73,6 +88,12 @@ class UserSetupUtil:
             return user_util.set_or_rotate_public_key(self._snowflake_user)
 
     def create_or_update_config(self, default_connection_name: str):
+        """Generate the Snowflake Connection configuration.
+
+        Args:
+        default_connection_name: The connection name to use, if None it defaults to `default`.
+
+        """
         conn_config = ConnectionConfig(
             self._keys_dir,
             self._snowflake_account,
@@ -87,6 +108,13 @@ class UserSetupUtil:
     def verify_keys_and_settings(
         self, public_key_fp: str, default_connection_name: str
     ):
+        """Run a sanity check to verify if the user able to connect.
+
+        Args:
+        public_key_fp: the public key fingerprint to verify with user settings.
+        default_connection_name: The connection name to use, if None it defaults to `default`.
+
+        """
         logger.debug("Verifying connection with new public key")
         if self.session is None:
             logger.debug("Creating new session")
@@ -126,7 +154,7 @@ class UserSetupUtil:
                 default_connection_name,
             ).create()
             _session.sql("DESC USER")
-            logger.info("User keys configured and working")
+            logger.info("User keys configured and verified successfully.")
         except Exception as e:
             logger.error(f"Error verifying, {e}", stack_info=True)
             raise e
@@ -135,7 +163,7 @@ class UserSetupUtil:
                 _session.close()
 
 
-def main():
+def main():  # noqa: D103
     if os.getenv("SNOWFLAKE_ACCOUNT") is None:
         logger.error("Environment variable 'SNOWFLAKE_ACCOUNT' is not defined")
         sys.exit(1)
@@ -154,7 +182,7 @@ def main():
 
     if os.getenv("SNOWFLAKE_ROLE") is None:
         logger.warning(
-            "Environment variable 'SNOWFLAKE_ROLE' is not defined, defaulting to 'ACCOUNTADMIN'"
+            "Environment variable 'SNOWFLAKE_ROLE' is not defined, defaulting to 'PUBLIC'"
         )
 
     if os.getenv("SNOWFLAKE_WAREHOUSE") is None:
