@@ -44,9 +44,6 @@ Built by Builders, for Builders working with Snowflake data platforms.
 
 The [base](./base) container provides a standardized Python development environment for Snowflake projects. 
 
-> [!NOTE]
-> Documentation coming soon.
-
 #### Forgeconfig
 
 The [forgeconfig](./forgeconfig/README.md) utility helps manage RSA key generation and configuration for Snowflake users. 
