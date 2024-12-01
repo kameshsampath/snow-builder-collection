@@ -49,10 +49,7 @@ The [base](./base) container provides a standardized Python development environm
 
 #### Forgeconfig
 
-The [forgeconfig](./forgeconfig) utility helps manage RSA key generation and configuration for Snowflake users. 
-
-> [!NOTE]
-> Documentation coming soon.
+The [forgeconfig](./forgeconfig/README.md) utility helps manage RSA key generation and configuration for Snowflake users. 
 
 ## References
 
