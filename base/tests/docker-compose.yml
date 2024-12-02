@@ -12,8 +12,8 @@ services:
     depends_on:
       - base
     environment:
-      # dummy test passphrase to check gpg decrypt
-      - PASSPHRASE=sup3rSecret!
+      # dummy test passphrase to check gpg encrypt/decrypt
+      - ENV_FILE_PASSPHRASE=sup3rSecret!
     user: me
     command:
       - bash

@@ -23,13 +23,26 @@ SNOWFLAKE_PASSWORD=your snowflake user password
 SNOWFLAKE_ROLE=ACCOUNTADMIN
 ```
 
-3. Start the service:
+3. Encrypt the `.env` using [gpg](https://gnupg.org/)
+
 ```shell
-cd $DEMO_HOME
-docker-compose up -d
+gpg --symmetric --cipher-algo AES256 .env
 ```
 
-4. Copy the generated configs to local machine:
+That should generate an encrypted version of the `.env` as `.env.gpg`. The encrypted file will be add to the container. The container will then decrypt in memory use it for needed Snowflake tasks and erase it once all tasks are successful.
+
+> [!IMPORTANT]
+> Make note of the passphrase anywhere safe and pass it in the next command
+
+4. Start the service:
+
+```shell
+cd $DEMO_HOME
+echo "ENV_FILE_PASSPHRASE=$ENV_FILE_PASSPHRASE" > .env.docker
+docker-compose up -e "ENV_FILE_PASSPHRASE=$ENV_FILE_PASSPHRASE" -d
+```
+
+5. Copy the generated configs to local machine:
 ```shell
 $PROJECT_HOME/scripts/bin/docker-copy.sh
 ```

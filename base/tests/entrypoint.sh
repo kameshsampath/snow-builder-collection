@@ -2,7 +2,7 @@
 set -e
 set -o pipefail
 
-DECRYPT_CMD="gpg --quiet --batch --yes --decrypt --passphrase $PASSPHRASE /app/.env.gpg"
+DECRYPT_CMD="gpg --quiet --batch --yes --decrypt --passphrase $ENV_FILE_PASSPHRASE /app/.env.gpg"
 
 # Export the decrypted environment variables
 eval "$($DECRYPT_CMD | sed 's/^/export /')"

@@ -19,7 +19,7 @@ func appendToFile(filename, text string) error {
 }
 
 func main() {
-    err := appendToFile("/etc/bash.bashrc", "unset PASSPHRASE")
+    err := appendToFile("/etc/bash.bashrc", "unset ENV_FILE_PASSPHRASE\n")
     if err != nil {
         fmt.Printf("Error: %v\n", err)
         return
