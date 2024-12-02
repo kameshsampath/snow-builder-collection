@@ -3,3 +3,4 @@ work
 !scripts/** */
 !.env.example
 **/.ruff_cache
+.env.docker
