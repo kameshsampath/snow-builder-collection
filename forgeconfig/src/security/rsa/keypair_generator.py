@@ -133,7 +133,7 @@ def gen_key(key_size: int = 4096) -> tuple[rsa.RSAPrivateKey, rsa.RSAPublicKey]:
 def save_private_key(
     private_key: rsa.RSAPrivateKey,
     filename: str | Path,
-    passphrase: str | bytes = None,
+    passphrase: bytes = None,
 ) -> None:
     """Save an encrypted private key to file with secure permissions.
 
@@ -150,22 +150,24 @@ def save_private_key(
     """
     logger.debug(f"Saving generated RSA Key to {filename}")
     pem = None
+    if passphrase is None:
+        raise ValueError("Passphrase is required to encrypt the private key.")
+
     # Convert passphrase to bytes
-    if passphrase is not None:
-        if isinstance(passphrase, str):
-            passphrase = passphrase.encode()
-            # Serialize the private key with encryption
-            pem = private_key.private_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PrivateFormat.PKCS8,
-                encryption_algorithm=serialization.BestAvailableEncryption(passphrase),
-            )
-    else:
+    if isinstance(passphrase, str):
+        passphrase = passphrase.encode()
+        # Serialize the private key with encryption
         pem = private_key.private_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption(),
+            encryption_algorithm=serialization.BestAvailableEncryption(passphrase),
         )
+    # else:
+    #     pem = private_key.private_bytes(
+    #         encoding=serialization.Encoding.PEM,
+    #         format=serialization.PrivateFormat.PKCS8,
+    #         encryption_algorithm=serialization.NoEncryption(),
+    #     )
 
     if pem is not None:
         # Write to file with secure permissions
@@ -219,7 +221,7 @@ def save_key_pair(
     private_key: rsa.RSAPrivateKey,
     private_key_path: str | Path,
     public_key_path: str | Path,
-    passphrase: str | bytes = None,
+    passphrase: str | bytes,
 ) -> bool:
     """Save both private and public keys securely.
 
@@ -241,15 +243,12 @@ def save_key_pair(
     logger.debug(
         f"Saving generated RSA KeyPair to {private_key_path}/{public_key_path}"
     )
-    try:
-        # Save private key
-        save_private_key(private_key, private_key_path, passphrase)
 
-        # Save public key
-        public_key = private_key.public_key()
-        save_public_key(public_key, public_key_path)
+    # Save private key
+    save_private_key(private_key, private_key_path, passphrase)
 
-        return True
-    except Exception as e:
-        logger.error(f"Error saving keypair {e}")
-        raise KeyPairSaveError(e)
+    # Save public key
+    public_key = private_key.public_key()
+    save_public_key(public_key, public_key_path)
+
+    return True

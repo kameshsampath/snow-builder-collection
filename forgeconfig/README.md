@@ -11,8 +11,6 @@ cp $DEMO_HOME/.env.example $DEMO/.env
 
 2. Set these required environment variables:
 ```shell
-# Application log level
-APP_LOG_LEVEL=DEBUG
 # Snowflake Account identifier
 SNOWFLAKE_ACCOUNT=your snowflake account id
 # Snowflake username
@@ -23,20 +21,36 @@ SNOWFLAKE_PASSWORD=your snowflake user password
 SNOWFLAKE_ROLE=ACCOUNTADMIN
 ```
 
-3. Start the service:
+3. Encrypt the `.env` using [gpg](https://gnupg.org/)
+
 ```shell
-cd $DEMO_HOME
-docker-compose up -d
+gpg --symmetric --cipher-algo AES256 .env
 ```
 
-4. Copy the generated configs to local machine:
+That should generate an encrypted version of the `.env` as `.env.gpg`. The encrypted file will be add to the container. The container will then decrypt in memory use it for needed Snowflake tasks and erase it once all tasks are successful.
+
+> [!IMPORTANT]
+>  - Make note of the passphrase anywhere safe and pass it in the next command
+>  - The same passphrase will be used to encrypt the generated RSA Private key
+> **TIP**: Use password generators to generate strong passwords
+
+4. Start the service:
+
+```shell
+cd $DEMO_HOME
+printf "APP_LOG_LEVEL=INFO\nENV_FILE_PASSPHRASE=%s" $ENV_FILE_PASSPHRASE > .env.docker
+docker-compose up -e "ENV_FILE_PASSPHRASE=$ENV_FILE_PASSPHRASE" -d
+```
+
+5. Copy the generated configs to local machine:
 ```shell
 $PROJECT_HOME/scripts/bin/docker-copy.sh
 ```
 
 5. Set up Snowflake CLI to use the config:
 ```shell
-export SNOWFLAKE_HOME=$PWD/.snowflake
+export SNOWFLAKE_HOME="$PWD/.snowflake"
+export PRIVATE_KEY_PASSPHRASE="$ENV_FILE_PASSPHRASE"
 snow connection test
 ```
 

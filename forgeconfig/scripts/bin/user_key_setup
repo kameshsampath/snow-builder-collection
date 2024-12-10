@@ -2,8 +2,9 @@
 """Run the Snowflake User setup."""
 
 import os
-import sys
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
 
 from snowflake.core import Root
 from snowflake.core.user import User
@@ -19,27 +20,69 @@ from security.util.rsa_key_util import (
 from security.util.user_util import UserUtil
 
 #
-logger = get_logger("user_setup_util")
+logger = get_logger("user_key_setup")
 
 
 class UserSetupUtil:
     """The utility used to setup the Snowflake user with the Keys."""
 
-    def __init__(self):  # noqa: D107
-        self._snowflake_account = os.getenv("SNOWFLAKE_ACCOUNT")
-        self._snowflake_user = os.getenv("SNOWFLAKE_USER")
-        self._snowflake_password = os.getenv("SNOWFLAKE_PASSWORD")
-        self._snowflake_role = os.getenv("SNOWFLAKE_ROLE", "PUBLIC")
-        self._snowflake_warehouse = (
-            os.getenv("SNOWFLAKE_WAREHOUSE")
-            if os.getenv("SNOWFLAKE_WAREHOUSE")
-            else "COMPUTE_WH"
+    def __init__(  # noqa: D107
+        self,
+        target_snowflake_account: str,
+        target_snowflake_user: str,
+        target_snowflake_default_role: str | None = "PUBLIC",
+        target_snowflake_default_wh: str | None = "COMPUTE_WH",
+    ):
+        self._target_snowflake_account = target_snowflake_account
+        self._target_snowflake_user = target_snowflake_user
+        self._snowflake_role = target_snowflake_default_role
+        self._snowflake_warehouse = target_snowflake_default_wh
+        self._keys_dir: Path = Path(
+            os.getenv("PRIVATE_KEY_FILE_DIR", Path.home().joinpath(".snowflake"))
         )
-        self._keys_dir: Path = os.getenv(
-            "PRIVATE_KEY_FILE_DIR", Path.home().joinpath(".snowflake")
-        )
+        self._config_dir = self._keys_dir
         self._private_key_passphrase = os.getenv("PRIVATE_KEY_PASSPHRASE", None)
         self.session = None
+
+    @contextmanager
+    def temporary_env_var(self, variables: dict[str, Any]) -> None:
+        """Context manager for temporarily setting environment variables.
+
+        Automatically restores the original state when exiting the context.
+
+        Args:
+        variables: Dictionary of environment variables and their values to set.
+
+        Example:
+          with temporary_env_var({"API_KEY": "secret", "DEBUG": "1"}):
+              # Code that needs these environment variables
+              pass
+          # Variables are automatically unset here
+
+        """
+        # Store the original state of variables
+        original_state: dict[str, str | None] = {}
+
+        try:
+            # Save original values and set new ones
+            for key, value in variables.items():
+                # Store the original value (or None if it didn't exist)
+                original_state[key] = os.environ.get(key)
+
+                # Set the new value, converting to string if necessary
+                os.environ[key] = str(value)
+
+            yield  # Allow the context block to execute
+
+        finally:
+            # Restore original state, whether or not an exception occurred
+            for key, original_value in original_state.items():
+                if original_value is None:
+                    # Variable didn't exist originally, so remove it
+                    os.environ.pop(key, None)
+                else:
+                    # Restore the original value
+                    os.environ[key] = original_value
 
     def generate_and_set_rsa_keys(self, rotate: bool = False) -> tuple[Path, str, bool]:
         """Generate RSA keypair and configure the RSA key authentication with Snowflake USER.
@@ -74,10 +117,10 @@ class UserSetupUtil:
             logger.info("Generating KeyPair")
             self.session = Session.builder.configs(
                 {
-                    "account": self._snowflake_account,
-                    "user": self._snowflake_user,
-                    "password": self._snowflake_password,
-                    "role": self._snowflake_role,
+                    "account": os.getenv("SNOWFLAKE_ACCOUNT"),
+                    "user": os.getenv("SNOWFLAKE_USER"),
+                    "password": os.getenv("SNOWFLAKE_PASSWORD"),
+                    "role": os.getenv("SNOWFLAKE_ROLE", "SECURITYADMIN"),
                 }
             ).getOrCreate()
 
@@ -85,7 +128,7 @@ class UserSetupUtil:
                 self.session,
                 self._keys_dir,
             )
-            return user_util.set_or_rotate_public_key(self._snowflake_user)
+            return user_util.set_or_rotate_public_key(self._target_snowflake_user)
 
     def create_or_update_config(self, default_connection_name: str):
         """Generate the Snowflake Connection configuration.
@@ -95,108 +138,151 @@ class UserSetupUtil:
 
         """
         conn_config = ConnectionConfig(
-            self._keys_dir,
-            self._snowflake_account,
-            self._snowflake_user,
-            self._pk_file,
-            default_connection_name,
-            self._snowflake_role,
-            self._snowflake_warehouse,
+            config_dir=self._config_dir,
+            snowflake_account=self._target_snowflake_account,
+            snowflake_user=self._target_snowflake_user,
+            private_key_path=self._pk_file,
+            default_connection_name=default_connection_name,
+            default_role=self._snowflake_role,
+            default_warehouse=self._snowflake_warehouse,
         )
         conn_config.write_config()
 
-    def verify_keys_and_settings(
-        self, public_key_fp: str, default_connection_name: str
-    ):
+    def verify_keys_and_settings(self, public_key_fp: str, connection_name: str):
         """Run a sanity check to verify if the user able to connect.
 
         Args:
         public_key_fp: the public key fingerprint to verify with user settings.
-        default_connection_name: The connection name to use, if None it defaults to `default`.
+        connection_name: The connection name to use, if None it defaults to `default`.
 
         """
-        logger.debug("Verifying connection with new public key")
-        if self.session is None:
-            logger.debug("Creating new session")
-            self.session = Session.builder.config(
-                "connection_name",
-                default_connection_name,
-            ).create()
-        _session = None
-        try:
-            root = Root(self.session)
-            user: User = root.users[self._snowflake_user].fetch()
-            # should match either rsa_public_key or rsa_public_key2
-            # strip SHA256:
-            _key_fp_1 = match_fingerprints(
-                public_key_fp, user.rsa_public_key_fp.replace("SHA256:", "")
-            )
-            if _key_fp_1:
-                logger.debug(
-                    f"Fingerprints '{public_key_fp}' == '{user.rsa_public_key_fp.replace('SHA256:', '')}' matches."
-                )
-            _key_fp_2 = match_fingerprints(
-                public_key_fp, user.rsa_public_key_2_fp.replace("SHA256:", "")
-            )
-            if _key_fp_2:
-                logger.debug(
-                    f"Fingerprints '{public_key_fp}' == '{user.rsa_public_key_2_fp.replace('SHA256:', '')}' matches."
-                )
-            if _key_fp_1 and _key_fp_2:
-                logger.error(
-                    f"Fingerprints mismatch,{public_key_fp} != {user.rsa_public_key_fp}\n\n or {public_key_fp} != {user.rsa_public_key_2_fp}"
-                )
-                return
-            logger.info("Fingerprints matches!")
-            # build a new session from the new config to make sure all works
-            _session = Session.builder.config(
-                "connection_name",
-                default_connection_name,
-            ).create()
-            _session.sql("DESC USER")
-            logger.info("User keys configured and verified successfully.")
-        except Exception as e:
-            logger.error(f"Error verifying, {e}", stack_info=True)
-            raise e
-        finally:
-            if _session is not None:
-                _session.close()
-
-
-def main():  # noqa: D103
-    if os.getenv("SNOWFLAKE_ACCOUNT") is None:
-        logger.error("Environment variable 'SNOWFLAKE_ACCOUNT' is not defined")
-        sys.exit(1)
-
-    if os.getenv("SNOWFLAKE_USER") is None:
-        logger.error("Environment variable 'SNOWFLAKE_USER' is not defined")
-        sys.exit(1)
-
-    if os.getenv("SNOWFLAKE_ACCOUNT") is None:
-        logger.error("Environment variable 'SNOWFLAKE_ACCOUNT' is not defined")
-        sys.exit(1)
-
-    if os.getenv("SNOWFLAKE_PASSWORD") is None:
-        logger.error("Environment variable 'SNOWFLAKE_PASSWORD' is not defined")
-        sys.exit(1)
-
-    if os.getenv("SNOWFLAKE_ROLE") is None:
-        logger.warning(
-            "Environment variable 'SNOWFLAKE_ROLE' is not defined, defaulting to 'PUBLIC'"
+        logger.debug(
+            f"Verifying connection with new public key for user {self._target_snowflake_user}"
         )
+        with self.temporary_env_var(
+            {"SNOWFLAKE_HOME": str(self._config_dir.resolve().absolute())}
+        ):
+            try:
+                _session = Session.builder.configs(
+                    {
+                        "connection_name": connection_name,
+                        "private_key_file_pwd": os.getenv("ENV_FILE_PASSPHRASE"),
+                    }
+                ).create()
+                root = Root(_session)
+                user: User = root.users[self._target_snowflake_user].fetch()
+                # logger.debug(f"Fetched user:{user.__dict__}")
+                # should match either rsa_public_key or rsa_public_key2
+                # strip SHA256:
+                _key_fp_1 = user.rsa_public_key_fp and match_fingerprints(
+                    public_key_fp, user.rsa_public_key_fp.replace("SHA256:", "")
+                )
+                if _key_fp_1:
+                    logger.debug(
+                        f"Fingerprints '{public_key_fp}' == '{user.rsa_public_key_fp.replace('SHA256:', '')}' matches."
+                    )
+                _key_fp_2 = user.rsa_public_key_2_fp and match_fingerprints(
+                    public_key_fp, user.rsa_public_key_2_fp.replace("SHA256:", "")
+                )
+                if _key_fp_2:
+                    logger.debug(
+                        f"Fingerprints '{public_key_fp}' == '{user.rsa_public_key_2_fp.replace('SHA256:', '')}' matches."
+                    )
+                if _key_fp_1 and _key_fp_2:
+                    logger.error(
+                        f"Fingerprints mismatch,{public_key_fp} != {user.rsa_public_key_fp}\n\n or {public_key_fp} != {user.rsa_public_key_2_fp}"
+                    )
+                    return
+                logger.info("Fingerprints matches!")
 
-    if os.getenv("SNOWFLAKE_WAREHOUSE") is None:
-        logger.warning(
-            "Environment variable 'SNOWFLAKE_WAREHOUSE' is not defined,using 'COMPUTE_WH' will be created if not exists."
-        )
+                logger.debug(
+                    f"Using Snowflake home:{os.getenv('SNOWFLAKE_HOME')}, connection_name:{connection_name}"
+                )
+                logger.info("User keys configured and verified successfully.")
+            except Exception as e:
+                logger.error(f"Error verifying, {e}", stack_info=True)
+                raise e
+            finally:
+                if _session is not None:
+                    _session.close()
+                if self.session is not None:
+                    self.session.close()
 
+
+def main(
+    target_snowflake_account: str,
+    target_snowflake_user: str,
+    target_snowflake_default_role: str,
+    target_snowflake_default_wh: str,
+    default_connection_name: str,
+    rotate: bool,
+):  # noqa: D103
+    """Trigger the Key generation and user configuration tasks."""
     logger.info("Good to run the Snowflake user configuration.")
-    user_util = UserSetupUtil()
-    _, public_key_fp, _ = user_util.generate_and_set_rsa_keys()
-    default_connection_name = os.getenv("SNOWFLAKE_DEFAULT_CONNECTION_NAME", "default")
+    user_util = UserSetupUtil(
+        target_snowflake_account=target_snowflake_account,
+        target_snowflake_user=target_snowflake_user,
+        target_snowflake_default_role=target_snowflake_default_role,
+        target_snowflake_default_wh=target_snowflake_default_wh,
+    )
+    _, public_key_fp, _ = user_util.generate_and_set_rsa_keys(rotate)
     user_util.create_or_update_config(default_connection_name)
     user_util.verify_keys_and_settings(public_key_fp, default_connection_name)
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        prog="user_key_setup",
+        description="Generate RSA Keypair and Connection Config for a Snowflake User.",
+    )
+    parser.add_argument(
+        "-a",
+        "--account",
+        required=True,
+        help="The Snowflake Account to be used when setting RSA Key authentication.",
+    )
+    parser.add_argument(
+        "-u",
+        "--user",
+        required=True,
+        help="The Snowflake User to be used when setting RSA Key authentication.",
+    )
+    parser.add_argument(
+        "-r",
+        "--role",
+        default="PUBLIC",
+        help="The Snowflake Role to be set as default in connection config.Default to 'PUBLIC'",
+    )
+    parser.add_argument(
+        "-w",
+        "--warehouse",
+        default="COMPUTE_WH",
+        help="The Snowflake Warehouse to be set as default in connection config.Default to 'COMPUTE_WH'",
+    )
+    parser.add_argument(
+        "-c",
+        "--connection-name",
+        default="default",
+        help="The Snowflake Connection name that will be set as default.Default to 'default'.",
+    )
+    parser.add_argument(
+        "-f",
+        "--rotate",
+        action="store_true",
+        help="Rotate the user keys.Default to 'False'.",
+    )
+
+    args = parser.parse_args()
+    if args.rotate:
+        logger.info("Rotate")
+    logger.info(f"Using arguments:{args}")
+    main(
+        target_snowflake_account=args.account,
+        target_snowflake_user=args.user,
+        target_snowflake_default_role=args.role,
+        target_snowflake_default_wh=args.warehouse,
+        default_connection_name=args.connection_name,
+        rotate=args.rotate,
+    )
