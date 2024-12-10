@@ -163,8 +163,11 @@ class UserSetupUtil:
             {"SNOWFLAKE_HOME": str(self._config_dir.resolve().absolute())}
         ):
             try:
-                _session = Session.builder.config(
-                    "connection_name", connection_name
+                _session = Session.builder.configs(
+                    {
+                        "connection_name": connection_name,
+                        "private_key_file_pwd": os.getenv("ENV_FILE_PASSPHRASE"),
+                    }
                 ).create()
                 root = Root(_session)
                 user: User = root.users[self._target_snowflake_user].fetch()

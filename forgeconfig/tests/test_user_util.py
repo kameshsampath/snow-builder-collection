@@ -1,9 +1,12 @@
 """Tests for updating the User with Keys."""
 
 import os
+from io import StringIO
 from pathlib import Path
 
 import pytest
+from dotenv import load_dotenv
+from gnupg import GPG, Crypt
 from snowflake.core import Root
 from snowflake.core.user import User
 from snowflake.snowpark.session import Session
@@ -17,7 +20,26 @@ logger = _logger("user_update_tests")
 
 
 @pytest.fixture(scope="module")
-def session():  # noqa: D103
+def load_snowflake_env():
+    """Decrypt and Load into memory."""
+    _encrypted_env_file = (
+        Path(__file__).parent.resolve().joinpath("..", ".env.gpg").resolve().absolute()
+    )
+    # IMPORTANT: require gpg installed locally
+    gpg = GPG()
+    out: Crypt = gpg.decrypt_file(
+        str(_encrypted_env_file),
+        passphrase=os.getenv(
+            "ENV_FILE_PASSPHRASE",
+        ),
+    )
+    config = StringIO(bytes.decode(out.data))
+    if load_dotenv(stream=config):
+        logger.info("Loaded environment successfully")
+
+
+@pytest.fixture(scope="module")
+def session(load_snowflake_env):  # noqa: D103
     session = Session.builder.configs(
         {
             "account": os.getenv("SNOWFLAKE_ACCOUNT"),
@@ -50,7 +72,7 @@ def snowflake_user(root: Root):  # noqa: D103
 
 @pytest.fixture(scope="module")
 def keys_dir():  # noqa: D103
-    _keys_dir = Path.joinpath(Path.cwd(), "tests", "keys")
+    _keys_dir = Path(__file__).parent.resolve().joinpath("keys")
     _keys_dir = create_secure_key_directory(_keys_dir)
 
     yield _keys_dir

@@ -3,3 +3,6 @@ ruff
 mypy
 pre-commit
 shellcheck-py
+python-gnupg
+ipykernel
+python-dotenv

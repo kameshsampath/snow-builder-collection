@@ -1,5 +1,6 @@
 """An helper and utility to update Snowflake User object with keys."""
 
+import os
 from pathlib import Path
 
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -82,11 +83,13 @@ class UserUtil:
             # generate the keypair
             self._private_key, self._public_key = gen_key()
 
+            passphrase = os.getenv("ENV_FILE_PASSPHRASE")
             # save the key pair
             save_key_pair(
                 self._private_key,
                 self._private_key_path,
                 self._public_key_path,
+                passphrase,
             )
             self.LOGGER.debug("Generated and saved keys")
             return (self._private_key, self._public_key)

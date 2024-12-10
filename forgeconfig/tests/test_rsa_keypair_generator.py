@@ -192,7 +192,7 @@ def verify_keypair_files(
 
 @pytest.fixture
 def keys_dir():  # noqa: D103
-    _keys_dir = Path.joinpath(Path.cwd(), "tests", "keys")
+    _keys_dir = Path(__file__).parent.resolve().joinpath("keys")
     _keys_dir = create_secure_key_directory(_keys_dir)
     yield _keys_dir
     # will be just one level
@@ -215,7 +215,7 @@ def test_save_key_pair(keys_dir):  # noqa: D103
     public_key_path = keys_dir.joinpath("test_pk.pub")
     private_key_passphrase = "test123@@"
 
-    private_key = gen_key()
+    private_key = gen_key()[0]
     is_created = save_key_pair(
         private_key,
         private_key_path,
@@ -237,28 +237,26 @@ def test_save_key_pair(keys_dir):  # noqa: D103
     is_valid = verify_keypair_files(
         private_key_path,
         public_key_path,
-        passphrase=private_key_passphrase,  # or None for unencrypted
+        passphrase=private_key_passphrase,
     )
     assert is_valid is True
 
 
 def test_save_key_pair_without_passphrase(keys_dir):  # noqa: D103
-    private_key_path = keys_dir.joinpath("test_pk.p8")
-    public_key_path = keys_dir.joinpath("test_pk.pub")
+    with pytest.raises(ValueError) as no_passphrase_err:
+        private_key_path = keys_dir.joinpath("test_pk.p8")
+        public_key_path = keys_dir.joinpath("test_pk.pub")
 
-    private_key = gen_key()
-    is_created = save_key_pair(
-        private_key,
-        private_key_path,
-        public_key_path,
+        private_key = gen_key()[0]
+        _ = save_key_pair(
+            private_key,
+            private_key_path,
+            public_key_path,
+            None,
+        )
+
+    assert isinstance(no_passphrase_err, ValueError) is not None
+    assert (
+        str(no_passphrase_err.value)
+        == "Passphrase is required to encrypt the private key."
     )
-
-    assert is_created is True
-    assert Path.exists(private_key_path) is True
-    assert Path.exists(public_key_path) is True
-
-    is_valid = verify_keypair_files(
-        private_key_path,
-        public_key_path,
-    )
-    assert is_valid is True
