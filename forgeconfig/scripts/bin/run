@@ -8,38 +8,27 @@ log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
 }
 
-# Trap signals
-cleanup() {
-    log "Received signal, shutting down container..."
-    exit 0
-}
-
-trap cleanup SIGTERM SIGINT
+trap exit SIGTERM SIGINT
 
 # Setup environment
 setup_environment() {
     # Set Python path to app directory
-    PYTHONPATH="${HOME}/app"
+    PYTHONPATH="${PYTHONPATH:-$HOME/app}"
     export PYTHONPATH
 
     # Decrypt sensitive values
-    DECRYPT_CMD="gpg --quiet --batch --yes --decrypt --passphrase $ENV_FILE_PASSPHRASE ${HOME}/app/.env.gpg"
+    DECRYPT_CMD="gpg --quiet --batch --yes --decrypt --passphrase $ENV_FILE_PASSPHRASE ${APP_DIR:-$HOME/app}/.env.gpg"
     export DECRYPT_CMD
 
     # Export the decrypted environment variables
-    eval "$($DECRYPT_CMD | sed 's/^/export /')"
+    eval "$($DECRYPT_CMD | sed 's/^/export /')" > /dev/null 2>&1
 
     log "Environment setup completed"
 }
 
 # Container initialization
 setup_container() {
-    # Add any necessary container setup steps here
-    # For example: checking required environment variables,
-    # validating configs, setting up directories, etc.
     setup_environment
-
-    # Return 0 for success, non-zero for failure
     return 0
 }
 
@@ -49,22 +38,16 @@ main() {
 
     setup_container
 
-    if ! user_key_setup; then
+    if user_key_setup --a "$TARGET_SNOWFLAKE_ACCOUNT" -u "$TARGET_SNOWFLAKE_USER" -f; then
+        log "Successfully setup your Snowflake user with keys"
+        # Cleanup sensitive data
+        eval "$($DECRYPT_CMD | cut -d= -f1 | sed 's/^/unset /')" || true
+        sudo unset_passphrase
+        exit 0
+    else
         log "User setup failed"
         exit 1
     fi
-
-    log "Successfully setup your Snowflake user with keys"
-
-    # TODO handle timeout and auto erase variables after timeout
-    # Unset all sensitive variables
-    eval "$($DECRYPT_CMD | cut -d= -f1 | sed 's/^/unset /')"
-    sudo unset_passphrase
-
-    # Keep container running for any debug/run snow commands etc.,
-    # Using `tail -f /dev/null` is a common pattern for keeping containers alive
-    # while still responding properly to signals
-    exec tail -f /dev/null
 }
 
 main "$@"
