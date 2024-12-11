@@ -1,0 +1,55 @@
+# https://taskfile.dev
+
+version: "3"
+
+vars:
+  BASE_IMAGE: ghcr.io/kameshsampath/snow-builder-collection/snow-base:py-311
+
+tasks:
+  build_forgeconfig:
+    desc: "Build the forgeconfig for local build and test."
+    cmds:
+      - >-
+        docker build --build-arg BASE_IMAGE={{.BASE_IMAGE}} -t
+        ghcr.io/kameshsampath/snow-builder-collection/snow-forgeconfig:dev -f
+        Dockerfile .
+    silent: true
+  encrypt_env:
+    silent: true
+    desc: "Encrypt the .env file using a passphrase"
+    cmds:
+      - >-
+        gpg --symmetric --batch --yes  --passphrase-file .env_file_passphrase \
+          --cipher-algo AES256 .env
+  deencrypt_env:
+    silent: true
+    desc: "Decrypt the .env file using a passphrase"
+    cmds:
+      - >-
+        gpg --decrypt  --batch  --passphrase-file .env_file_passphrase .env.gpg
+  setup_user:
+    silent: true
+    desc: "Run the setup user using the forgeconfig container."
+    deps:
+      - encrypt_env
+      - build_forgeconfig
+    cmds:
+      - >-
+        docker compose up --build config -d
+  copy_config_to_local:
+    desc: "Copy files from  docker container to local folder."
+    silent: true
+    cmds:
+      - rm -rf .snowflake
+      - ./scripts/bin/docker-copy.sh
+  test_connection:
+    desc: "Test Snowflake Connection using the generated configuration."
+    silent: true
+    deps:
+      - copy_config_to_local
+    cmds:
+      - |
+        #!/bin/bash
+        export SNOWFLAKE_HOME="$PWD/.snowflake"
+        export PRIVATE_KEY_PASSPHRASE="$(cat .env_file_passphrase)"
+        snow connection test
