@@ -2,3 +2,5 @@ snowflake
 snowflake-snowpark-python
 requests
 tomli-w
+python-dotenv
+python-gnupg

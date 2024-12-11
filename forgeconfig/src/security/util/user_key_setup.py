@@ -208,81 +208,23 @@ class UserSetupUtil:
                 if self.session is not None:
                     self.session.close()
 
-
-def main(
-    target_snowflake_account: str,
-    target_snowflake_user: str,
-    target_snowflake_default_role: str,
-    target_snowflake_default_wh: str,
-    default_connection_name: str,
-    rotate: bool,
-):  # noqa: D103
-    """Trigger the Key generation and user configuration tasks."""
-    logger.info("Good to run the Snowflake user configuration.")
-    user_util = UserSetupUtil(
-        target_snowflake_account=target_snowflake_account,
-        target_snowflake_user=target_snowflake_user,
-        target_snowflake_default_role=target_snowflake_default_role,
-        target_snowflake_default_wh=target_snowflake_default_wh,
-    )
-    _, public_key_fp, _ = user_util.generate_and_set_rsa_keys(rotate)
-    user_util.create_or_update_config(default_connection_name)
-    user_util.verify_keys_and_settings(public_key_fp, default_connection_name)
-
-
-if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser(
-        prog="user_key_setup",
-        description="Generate RSA Keypair and Connection Config for a Snowflake User.",
-    )
-    parser.add_argument(
-        "-a",
-        "--account",
-        required=True,
-        help="The Snowflake Account to be used when setting RSA Key authentication.",
-    )
-    parser.add_argument(
-        "-u",
-        "--user",
-        required=True,
-        help="The Snowflake User to be used when setting RSA Key authentication.",
-    )
-    parser.add_argument(
-        "-r",
-        "--role",
-        default="PUBLIC",
-        help="The Snowflake Role to be set as default in connection config.Default to 'PUBLIC'",
-    )
-    parser.add_argument(
-        "-w",
-        "--warehouse",
-        default="COMPUTE_WH",
-        help="The Snowflake Warehouse to be set as default in connection config.Default to 'COMPUTE_WH'",
-    )
-    parser.add_argument(
-        "-c",
-        "--connection-name",
-        default="default",
-        help="The Snowflake Connection name that will be set as default.Default to 'default'.",
-    )
-    parser.add_argument(
-        "-f",
-        "--rotate",
-        action="store_true",
-        help="Rotate the user keys.Default to 'False'.",
-    )
-
-    args = parser.parse_args()
-    if args.rotate:
-        logger.info("Rotate")
-    logger.info(f"Using arguments:{args}")
-    main(
-        target_snowflake_account=args.account,
-        target_snowflake_user=args.user,
-        target_snowflake_default_role=args.role,
-        target_snowflake_default_wh=args.warehouse,
-        default_connection_name=args.connection_name,
-        rotate=args.rotate,
-    )
+    @staticmethod
+    def run(
+        target_snowflake_account: str,
+        target_snowflake_user: str,
+        target_snowflake_default_role: str,
+        target_snowflake_default_wh: str,
+        default_connection_name: str,
+        rotate: bool,
+    ):  # noqa: D103
+        """Trigger the Key generation and user configuration tasks."""
+        logger.info("Good to run the Snowflake user configuration.")
+        user_util = UserSetupUtil(
+            target_snowflake_account=target_snowflake_account,
+            target_snowflake_user=target_snowflake_user,
+            target_snowflake_default_role=target_snowflake_default_role,
+            target_snowflake_default_wh=target_snowflake_default_wh,
+        )
+        _, public_key_fp, _ = user_util.generate_and_set_rsa_keys(rotate)
+        user_util.create_or_update_config(default_connection_name)
+        user_util.verify_keys_and_settings(public_key_fp, default_connection_name)
