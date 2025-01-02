@@ -1,53 +1,130 @@
-#!/usr/bin/env bash
+#!/usr/bin/env python3
 
-# Exit on error, undefined variables, and pipe failures
-set -euo pipefail
+import os
+import subprocess
+from contextlib import contextmanager
+from io import StringIO
+from pathlib import Path
 
-# Setup logging
-log() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
-}
+from dotenv import dotenv_values
+from gnupg import GPG, Crypt
 
-trap exit SIGTERM SIGINT
+from log.logger import get_logger
+from security.util.user_key_setup import UserSetupUtil
 
-# Setup environment
-setup_environment() {
-    # Set Python path to app directory
-    PYTHONPATH="${PYTHONPATH:-$HOME/app}"
-    export PYTHONPATH
+logger = get_logger("forgeconfig_runner")
 
-    # Decrypt sensitive values
-    DECRYPT_CMD="gpg --quiet --batch --yes --decrypt --passphrase $ENV_FILE_PASSPHRASE ${APP_DIR:-$HOME/app}/.env.gpg"
-    export DECRYPT_CMD
 
-    # Export the decrypted environment variables
-    eval "$($DECRYPT_CMD | sed 's/^/export /')" > /dev/null 2>&1
+@contextmanager
+def temp_env(_encrypted_env_file: Path | str = os.getenv("ENV_FILE")):
+    """Decrypt the encrypted env file using.
 
-    log "Environment setup completed"
-}
+    Build a temporary context using the environment variables loaded from the encrypted
+    env file in-memory and yield context with those values. Once the context exists the
+    environment variables are erased from the memory.
 
-# Container initialization
-setup_container() {
-    setup_environment
-    return 0
-}
+    Args:
+    _encrypted_env_file: the encrypted env file to decrypt
 
-# Main entrypoint
-main() {
-    log "Starting container"
+    ValueError: When the passphrase is empty
 
-    setup_container
+    """
+    __passphrase = os.getenv("ENV_FILE_PASSPHRASE")
 
-    if user_key_setup --a "$TARGET_SNOWFLAKE_ACCOUNT" -u "$TARGET_SNOWFLAKE_USER" -f; then
-        log "Successfully setup your Snowflake user with keys"
-        # Cleanup sensitive data
-        eval "$($DECRYPT_CMD | cut -d= -f1 | sed 's/^/unset /')" || true
-        sudo unset_passphrase
-        exit 0
-    else
-        log "User setup failed"
-        exit 1
-    fi
-}
+    if isinstance(__passphrase, str):
+        gpg = GPG()
+        out: Crypt = gpg.decrypt_file(
+            str(_encrypted_env_file),
+            passphrase=__passphrase,
+        )
+        config = StringIO(bytes.decode(out.data))
 
-main "$@"
+        env_vars: dict[str, str] = dotenv_values(stream=config)
+        original_env: dict[str, str] = {
+            key: os.getenv(key) for key in env_vars if env_vars[key] is not None
+        }
+        try:
+            # Set new values
+            {
+                os.environ.__setitem__(key, value)
+                for key, value in env_vars.items()
+                if value is not None
+            }
+            yield
+
+        finally:
+            # Restore original state using dict comprehension
+            {
+                os.environ.pop(key, None)
+                if value is None
+                else os.environ.__setitem__(key, value)
+                for key, value in original_env.items()
+            }
+    else:
+        raise ValueError("Passphrase required.")
+
+
+with temp_env():
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        prog="user_key_setup",
+        description="Generate RSA Keypair and Connection Config for a Snowflake User.",
+    )
+    parser.add_argument(
+        "-a",
+        "--account",
+        help="The Snowflake Account to be used when setting RSA Key authentication.",
+        default=os.getenv("TARGET_SNOWFLAKE_ACCOUNT"),
+    )
+    parser.add_argument(
+        "-u",
+        "--user",
+        help="The Snowflake User to be used when setting RSA Key authentication.",
+        default=os.getenv("TARGET_SNOWFLAKE_USER"),
+    )
+    parser.add_argument(
+        "-r",
+        "--role",
+        default=os.getenv("TARGET_SNOWFLAKE_ROLE", "PUBLIC"),
+        help="The Snowflake Role to be set as default in connection config.Default to 'PUBLIC'",
+    )
+    parser.add_argument(
+        "-w",
+        "--warehouse",
+        default=os.getenv("TARGET_SNOWFLAKE_WAREHOUSE", "COMPUTE_WH"),
+        help="The Snowflake Warehouse to be set as default in connection config.Default to 'COMPUTE_WH'",
+    )
+    parser.add_argument(
+        "-c",
+        "--connection-name",
+        default=os.getenv("TARGET_SNOWFLAKE_DEFAULT_CONNECTION_NAME", "default"),
+        help="The Snowflake Connection name that will be set as default.Default to 'default'.",
+    )
+    parser.add_argument(
+        "-f",
+        "--rotate",
+        action="store_true",
+        help="Rotate the user keys.Default to 'False'.",
+    )
+
+    args = parser.parse_args()
+    if args.rotate:
+        logger.info("Rotate")
+
+    logger.debug(f"Using arguments:{args}")
+
+    # Setup user and their public key, and generate the connection configuration
+    UserSetupUtil.run(
+        target_snowflake_account=args.account,
+        target_snowflake_user=args.user,
+        target_snowflake_default_role=args.role,
+        target_snowflake_default_wh=args.warehouse,
+        default_connection_name=args.connection_name,
+        rotate=args.rotate,
+    )
+    # unset all env variables
+    try:
+        subprocess.run(["sudo", "unset_passphrase"], check=False)
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Error cleaning up passphrase from shell:{e}")

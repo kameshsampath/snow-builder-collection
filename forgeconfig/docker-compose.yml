@@ -2,19 +2,19 @@ services:
    config:
      container_name: snow-forgeconfig
      build:
-       dockerfile_inline: |
-          FROM ghcr.io/kameshsampath/snow-builder-collection/snow-forgeconfig:py-311
+       dockerfile: Dockerfile.demo
        context: .
        args:
          - PYTHON_TAG=311
+         - TAG=dev
      image: localhost/snow-forgeconfig-demo
      user: me
      volumes:
         - snow_forgeconfig_demo:/home/me/.snowflake
      env_file:
       - .env.docker
-     entrypoint:
-        - /home/me/.local/bin/run
+     command:
+        - -f
 volumes:
   snow_forgeconfig_demo:
        

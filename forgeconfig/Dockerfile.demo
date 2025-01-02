@@ -1,0 +1,5 @@
+ARG PYTHON_TAG=311
+ARG TAG=latest
+FROM ghcr.io/kameshsampath/snow-builder-collection/snow-forgeconfig:${TAG}
+
+ENTRYPOINT [ "/home/me/.local/bin/run" ]

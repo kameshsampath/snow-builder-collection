@@ -1,23 +1,10 @@
 services:
-  base:
-    image: ghcr.io/kameshsampath/snow-builder-collection/snow-base:dev
-    build:
-      context: ../
-      dockerfile: Dockerfile
   test:
     image: ghcr.io/kameshsampath/snow-builder-collection/snow-base:dev
     build:
       context: .
       dockerfile: Dockerfile
-    depends_on:
-      - base
     environment:
       # dummy test passphrase to check gpg encrypt/decrypt
-      - ENV_FILE_PASSPHRASE=sup3rSecret!
+      - "ENV_FILE_PASSPHRASE=sup3rSecret!"
     user: me
-    command:
-      - bash
-      - -c 
-      - tail
-      - -f 
-      - /dev/null

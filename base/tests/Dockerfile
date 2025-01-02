@@ -6,6 +6,6 @@ WORKDIR /app
 
 COPY test.env.gpg /app/.env.gpg
 
-COPY entrypoint.sh /entrypoint
+COPY entrypoint.py /entrypoint
 
 ENTRYPOINT [ "/entrypoint" ]

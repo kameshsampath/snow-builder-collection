@@ -1,2 +1,4 @@
 snowflake-snowpark-python
 snowflake-cli
+python-gnupg
+python-dotenv
